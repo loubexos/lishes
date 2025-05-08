@@ -23,7 +23,7 @@ git clone https://github.com/loubexos/testing.git
 cd testing
 
 # 1: Then open config.php and enter your database information
-# 2: Now open the setup.php (your.domain.com/testing-main/setup)file in your browser to create all tables
+# 2: Now open the /setup (your.domain.com/testing-main/setup)directory in your browser to create all tables
 # 3 IMPORTANT: Please save the configuration directory(your.domain.com/testing-main/config) with HTML basic authentication first, so that others cannot edit your wishes(own login is planned!)
 # 4 PLEASE READ: If you want to change the path to your liking, change the name Testing-Main to whatever you want or move the list wherever you want
 ```
