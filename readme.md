@@ -19,7 +19,7 @@ Webserver and a mysql database
 ## How to Install
 ```bash
 # Go into your webserver root dir
-git clone https://github.com/loubexos/testing.git
+git clone https://github.com/loubexos/lishes.git
 cd testing
 
 # 1: Then open config.php and enter your database information
