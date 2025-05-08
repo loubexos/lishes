@@ -144,7 +144,7 @@ $stmt->close();
   <title>Wish-Config</title>
   <link rel="icon" href="<?= htmlspecialchars($faviconUrl, ENT_QUOTES) ?>" type="image/x-icon">
   <script>tailwind.config = { darkMode: 'class' }</script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="../tail.js"></script>
 </head>
 <body class="bg-gray-900 text-gray-100">
 
