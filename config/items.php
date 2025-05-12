@@ -206,7 +206,7 @@ $stmt->close();
                class="w-full h-40 object-cover"
                onerror="this.src='<?= htmlspecialchars($errImageUrl, ENT_QUOTES) ?>';">
           <div class="p-3 flex-1 flex flex-col">
-            <h3 class="text-lg font-bold text-gray-100 truncate"><?= htmlspecialchars($row['name'], ENT_QUOTES) ?></h3>
+            <h3 class="text-lg font-bold text-gray-100 truncate" title="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"><?=htmlspecialchars($row['name'],ENT_QUOTES) ?></h3>
             <p class="mt-1 text-gray-300">€<?= number_format($row['price'], 2, '.', '') ?></p>
             <a href="<?= htmlspecialchars($row['product_url'], ENT_QUOTES) ?>" target="_blank"
                class="mt-2 mb-2 text-center bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
@@ -258,7 +258,7 @@ $stmt->close();
                class="w-full h-40 object-cover"
                onerror="this.src='<?= htmlspecialchars($errImageUrl, ENT_QUOTES) ?>';">
           <div class="p-3 flex-1 flex flex-col">
-            <h3 class="text-lg font-bold text-gray-100 truncate"><?= htmlspecialchars($row['name'], ENT_QUOTES) ?></h3>
+            <h3 class="text-lg font-bold text-gray-100 truncate" title="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"><?=htmlspecialchars($row['name'],ENT_QUOTES) ?></h3>
             <p class="mt-1 text-gray-300">€<?= number_format($row['price'], 2, '.', '') ?></p>
             <a href="<?= htmlspecialchars($row['product_url'], ENT_QUOTES) ?>" target="_blank"
                class="mt-2 mb-2 text-center bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
