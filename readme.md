@@ -20,12 +20,13 @@ Webserver and a mysql database
 ```bash
 # Go into your webserver root dir
 git clone https://github.com/loubexos/lishes.git
-cd testing
+# 4 PLEASE READ: If you want to change the path to your liking, change the name lishes to whatever you want or move the list wherever you want
+cd <your folder name>
 
 # 1: Then open config.php and enter your database information
-# 2: Now open the /setup (your.domain.com/lishes/setup)directory in your browser to create all tables
-# 3 IMPORTANT: Please save the configuration directory(your.domain.com/lishes/config) with HTML basic authentication first, so that others cannot edit your wishes(own login is planned!)
-# 4 PLEASE READ: If you want to change the path to your liking, change the name Testing-Main to whatever you want or move the list wherever you want
+# 2: Now open the /setup (your.domain.com/<your folder name>/setup)directory in your browser to create all tables
+# 3 IMPORTANT: Please save the configuration directory(your.domain.com/<your folder name>/config) with HTML basic authentication first, so that others cannot edit your wishes(own login is planned!)
+# 4 PLEASE READ: If you want to change the path to your liking, change the name lishes to whatever you want or move the list wherever you want
 ```
 ## Planned
 - Administration panel login protection
