@@ -1,6 +1,16 @@
 <?php
 include 'config.php';
 
+/**
+ * Kleine Helper-Funktion, um HEX-Farben sicher zu validieren.
+ * Erlaubt #RGB und #RRGGBB. Gibt bei ungültiger Eingabe null zurück.
+ */
+function sanitize_hex(?string $hex): ?string {
+    if (!$hex) return null;
+    $hex = trim($hex);
+    return preg_match('/^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/', $hex) ? $hex : null;
+}
+
 // Aktives Preset abrufen (verwende den Datensatz, bei dem active = 1 gesetzt ist)
 $resultActive = $conn->query("SELECT * FROM customization_settings WHERE active = 1 LIMIT 1");
 if ($resultActive && $resultActive->num_rows > 0) {
@@ -21,6 +31,13 @@ $errimage_url   = $activePreset['errimage_url'];
 $bgImageEnabled = $activePreset['bg_image_enabled'];
 $bgImageUrl     = $activePreset['bg_image_url'];
 $bg_blur        = (int)$activePreset['bg_blur'];
+
+/**
+ * NEU: Favoriten-Randfarbe aus Preset (DB) – per HEX konfigurierbar.
+ * Fällt zurück auf das bisherige Gelb (#facc15), wenn DB-Wert fehlt/ungültig.
+ */
+$favBorderHexRaw = $activePreset['favorite_border_hex'] ?? '#facc15';
+$favBorderHex    = sanitize_hex($favBorderHexRaw) ?? '#facc15';
 
 // Wunschlistenprodukte abrufen – Favoriten sollen oben gelistet werden
 $stmt = $conn->prepare("SELECT * FROM wishlist ORDER BY is_favorite DESC, position ASC, id ASC");
@@ -50,11 +67,12 @@ $stmt->close();
     /* Globale Transitions */
     .transition-all { transition: all 0.3s ease-in-out; }
 
-    /* Wunschlisten-Favoriten-Rahmen */
-    .wishlist-item[data-favorite="1"] {
-      border: 4px solid #facc15;
-      border-radius: 0.75rem;
-    }
+    /**
+     * HINWEIS:
+     * Die frühere feste Favoriten-Borderfarbe wurde entfernt.
+     * Der Rahmen (Farbe & Sichtbarkeit) wird jetzt dynamisch über data-Attribute + JS gesetzt,
+     * damit sowohl Favoriten- als auch individuelle Wunsch-Farben aus der DB kommen können.
+     */
 
     /* Hintergrund-Overlay für das Hintergrundbild */
     #background-overlay {
@@ -81,6 +99,24 @@ $stmt->close();
     #scrollToTop.visible {
       opacity: 1;
       transform: translateY(0);
+    }
+
+    /* Optische Basis für Items (ohne sichtbaren Rahmen; dieser kommt per Inline-Style/JS) */
+    .wishlist-item {
+      border: 4px solid transparent;
+      border-radius: 0.75rem;
+    }
+
+    /* Kleine Farbkapsel/Badge in der Ecke als visuelle Hilfe */
+    .color-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 14px;
+      height: 14px;
+      border-radius: 9999px;
+      border: 2px solid rgba(0,0,0,0.12);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.6) inset;
     }
   </style>
 </head>
@@ -117,17 +153,27 @@ $stmt->close();
 
       <!-- Ausklappbares Filter-Menü -->
       <div id="filter-menu" class="hidden mt-4 bg-gray-100 dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-        <h2 class="text-xl font-bold mb-4 text-blue-800 dark:text-blue-200">Filter Optionen</h2>
+        <h2 class="text-xl font-bold mb-4 text-blue-800 dark:text-blue-200">Filter & Sortierung</h2>
         <!-- Sortierung -->
-        <div class="mb-4">
-          <label for="sort" class="block font-medium text-blue-800 dark:text-blue-200 mb-1">Sortierung</label>
-          <select id="sort"
-                  class="w-full border border-blue-300 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  onchange="sortList()">
-            <option value="none">Keine Sortierung</option>
-            <option value="asc">Preis ↑ Aufsteigend</option>
-            <option value="desc">Preis ↓ Absteigend</option>
-          </select>
+        <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="sort" class="block font-medium text-blue-800 dark:text-blue-200 mb-1">Sortierung</label>
+            <select id="sort"
+                    class="w-full border border-blue-300 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    onchange="sortList()">
+              <option value="none">Keine Sortierung</option>
+              <option value="asc">Preis ↑ Aufsteigend</option>
+              <option value="desc">Preis ↓ Absteigend</option>
+              <option value="color">Farbe (HEX A→Z)</option>
+            </select>
+          </div>
+          <div>
+            <label for="color-filter" class="block font-medium text-blue-800 dark:text-blue-200 mb-1">Farb-Filter (HEX)</label>
+            <input type="text" id="color-filter" placeholder="#ff0000 oder #f00"
+                   class="w-full border rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   oninput="filterList()">
+            <p class="text-xs mt-1 text-gray-600 dark:text-gray-300">Zeige nur Wünsche mit exakt passender Rahmenfarbe.</p>
+          </div>
         </div>
         <!-- Preis-Filter -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -173,11 +219,30 @@ $stmt->close();
           $image_url   = htmlspecialchars($row['image_url'], ENT_QUOTES, 'UTF-8');
           $product_url = htmlspecialchars($row['product_url'], ENT_QUOTES, 'UTF-8');
           $isFavorite  = (isset($row['is_favorite']) && $row['is_favorite']) ? '1' : '0';
+
+          /**
+           * NEU: individuelle Wunsch-Farbe aus DB (Spalte: color_hex)
+           * Falls leer/ungültig => kein individueller Rahmen.
+           */
+          $wishColorRaw = $row['color_hex'] ?? null;
+          $wishColorHex = sanitize_hex($wishColorRaw);
+          
+          // Final zu nutzende Rahmenfarbe: Favorit > individuelle Wunsch-Farbe > transparent
+          $finalBorderColor = ($isFavorite === '1')
+            ? $favBorderHex
+            : ($wishColorHex ?? 'transparent');
+
+          // Für JS/Filter als Datenattribut durchreichen
+          $dataColor = ($isFavorite === '1') ? $favBorderHex : ($wishColorHex ?? '');
         ?>
           <div class="wishlist-item relative bg-white dark:bg-gray-800 p-4 rounded-xl shadow flex flex-wrap items-center gap-4"
                data-price="<?php echo $price; ?>"
                data-name="<?php echo strtolower($name); ?>"
-               data-favorite="<?php echo $isFavorite; ?>">
+               data-favorite="<?php echo $isFavorite; ?>"
+               data-color="<?php echo htmlspecialchars($dataColor, ENT_QUOTES, 'UTF-8'); ?>"
+               style="border-color: <?php echo htmlspecialchars($finalBorderColor, ENT_QUOTES, 'UTF-8'); ?>;">
+            <span class="color-badge" style="background: <?php echo htmlspecialchars($dataColor ?: 'transparent', ENT_QUOTES, 'UTF-8'); ?>;"></span>
+
             <img src="<?php echo $image_url; ?>"
                  alt="<?php echo $name; ?>"
                  class="w-24 h-24 object-cover rounded-lg"
@@ -190,7 +255,7 @@ $stmt->close();
             </div>
             <?php if ($isFavorite === '1'): ?>
               <div class="w-12 flex items-center justify-end">
-                <span class="text-yellow-500 text-4xl">★</span>
+                <span class="text-4xl" style="color: <?php echo htmlspecialchars($favBorderHex, ENT_QUOTES, 'UTF-8'); ?>;">★</span>
               </div>
             <?php endif; ?>
           </div>
@@ -259,20 +324,42 @@ $stmt->close();
         : 'Filter ausblenden';
     });
 
+    // Utils
+    function normalizeHex(hex) {
+      if (!hex) return '';
+      hex = hex.trim();
+      // #RGB -> #RRGGBB
+      const shortMatch = /^#([A-Fa-f0-9]{3})$/.exec(hex);
+      if (shortMatch) {
+        const s = shortMatch[1];
+        return '#' + s[0]+s[0] + s[1]+s[1] + s[2]+s[2];
+      }
+      // #RRGGBB
+      const longMatch = /^#([A-Fa-f0-9]{6})$/.exec(hex);
+      return longMatch ? '#' + longMatch[1] : '';
+    }
+
     // Filter-, Such- & Sortierfunktionen
     function filterList() {
       const min = parseFloat(document.getElementById('min-price').value) || 0;
       const max = parseFloat(document.getElementById('max-price').value) || Infinity;
-      const search = document.getElementById('search').value.toLowerCase();
+      const search = (document.getElementById('search').value || '').toLowerCase();
       const favoriteOnly = document.getElementById('favorite-only').checked;
+      const colorFilterRaw = document.getElementById('color-filter').value || '';
+      const colorFilter = normalizeHex(colorFilterRaw);
+
       document.querySelectorAll('.wishlist-item').forEach(item => {
         const price = parseFloat(item.getAttribute('data-price'));
-        const name = item.getAttribute('data-name');
+        const name = item.getAttribute('data-name') || '';
         const isFavorite = item.getAttribute('data-favorite') === '1';
+        const itemColor = normalizeHex(item.getAttribute('data-color') || '');
+
         const matchesPrice = (price >= min && price <= max);
         const matchesSearch = name.includes(search);
         const matchesFavorite = !favoriteOnly || isFavorite;
-        item.style.display = (matchesPrice && matchesSearch && matchesFavorite) ? 'flex' : 'none';
+        const matchesColor = colorFilter ? (itemColor === colorFilter) : true;
+
+        item.style.display = (matchesPrice && matchesSearch && matchesFavorite && matchesColor) ? 'flex' : 'none';
       });
     }
 
@@ -282,6 +369,7 @@ $stmt->close();
       document.getElementById('search').value = '';
       document.getElementById('sort').value = 'none';
       document.getElementById('favorite-only').checked = false;
+      document.getElementById('color-filter').value = '';
       document.querySelectorAll('.wishlist-item').forEach(item => {
         item.style.display = 'flex';
       });
@@ -291,11 +379,23 @@ $stmt->close();
       const sortValue = document.getElementById('sort').value;
       const container = document.getElementById('wishlist');
       let items = Array.from(container.querySelectorAll('.wishlist-item'));
-      items.sort((a, b) => {
-        const priceA = parseFloat(a.getAttribute('data-price'));
-        const priceB = parseFloat(b.getAttribute('data-price'));
-        return sortValue === 'asc' ? priceA - priceB : priceB - priceA;
-      });
+
+      if (sortValue === 'asc' || sortValue === 'desc') {
+        items.sort((a, b) => {
+          const priceA = parseFloat(a.getAttribute('data-price')) || 0;
+          const priceB = parseFloat(b.getAttribute('data-price')) || 0;
+          return sortValue === 'asc' ? priceA - priceB : priceB - priceA;
+        });
+      } else if (sortValue === 'color') {
+        items.sort((a, b) => {
+          const ca = (a.getAttribute('data-color') || '').toLowerCase();
+          const cb = (b.getAttribute('data-color') || '').toLowerCase();
+          // Leere Farben ans Ende
+          if (!ca && cb) return 1;
+          if (ca && !cb) return -1;
+          return ca.localeCompare(cb);
+        });
+      }
       items.forEach(item => container.appendChild(item));
     }
 
