@@ -1,7 +1,7 @@
 <?php
 include 'config.php';
 
-// Retrieve active preset (use the data set for which active = 1 is set)
+// Aktives Preset abrufen (verwende den Datensatz, bei dem active = 1 gesetzt ist)
 $resultActive = $conn->query("SELECT * FROM customization_settings WHERE active = 1 LIMIT 1");
 if ($resultActive && $resultActive->num_rows > 0) {
     $activePreset = $resultActive->fetch_assoc();
@@ -11,7 +11,7 @@ if ($resultActive && $resultActive->num_rows > 0) {
     $activePreset = $resultFallback->fetch_assoc();
 }
 
-// Dark mode settings from the preset
+// Dark Mode Einstellungen aus dem Preset
 $darkModeSwitchEnabled = (int)$activePreset['dark_mode_switch_enabled'];
 $defaultMode           = $activePreset['default_mode'];
 
@@ -22,7 +22,7 @@ $bgImageEnabled = $activePreset['bg_image_enabled'];
 $bgImageUrl     = $activePreset['bg_image_url'];
 $bg_blur        = (int)$activePreset['bg_blur'];
 
-// Retrieve wish list products - favorites should be listed at the top
+// Wunschlistenprodukte abrufen – Favoriten sollen oben gelistet werden
 $stmt = $conn->prepare("SELECT * FROM wishlist ORDER BY is_favorite DESC, position ASC, id ASC");
 $stmt->execute();
 $wishlistResult = $stmt->get_result();
@@ -34,7 +34,7 @@ $stmt->close();
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?php echo $headerTitle; ?></title>
-  <!-- Set favicon dynamically -->
+  <!-- Favicon dynamisch setzen -->
   <?php if (!empty($faviconUrl)): ?>
     <link rel="icon" href="<?php echo htmlspecialchars($faviconUrl, ENT_QUOTES, 'UTF-8'); ?>" type="image/x-icon">
   <?php else: ?>
@@ -47,16 +47,16 @@ $stmt->close();
   </script>
 
   <style>
-    /* Global transitions */
+    /* Globale Transitions */
     .transition-all { transition: all 0.3s ease-in-out; }
 
-    /* Wish list favorites frame */
+    /* Wunschlisten-Favoriten-Rahmen */
     .wishlist-item[data-favorite="1"] {
       border: 4px solid #facc15;
       border-radius: 0.75rem;
     }
 
-    /* Background overlay for the background image */
+    /* Hintergrund-Overlay für das Hintergrundbild */
     #background-overlay {
       position: fixed;
       top: 0;
@@ -68,11 +68,11 @@ $stmt->close();
       z-index: -1;
     }
 
-    /* Scroll-To-Top Button */
+    /* Smooth Scroll-To-Top Button */
     #scrollToTop {
       position: fixed;
-      bottom: 1.5rem; /* corresponds to bottom-6 */
-      right: 1.5rem;  /* corresponds to right-6 */
+      bottom: 1.5rem; /* entspricht bottom-6 */
+      right: 1.5rem;  /* entspricht right-6 */
       opacity: 0;
       transform: translateY(20px);
       transition: opacity 0.3s ease, transform 0.3s ease;
@@ -93,7 +93,7 @@ $stmt->close();
     </div>
   <?php endif; ?>
 
-  <!-- Header area -->
+  <!-- Header-Bereich -->
   <header class="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 shadow">
     <div class="max-w-5xl mx-auto px-4 py-8">
       <div class="flex flex-row items-center justify-between gap-4">
@@ -104,32 +104,32 @@ $stmt->close();
         </button>
       </div>
 
-      <!-- Search and filter section -->
+      <!-- Such- und Filtersection -->
       <div class="mt-6 flex flex-col md:flex-row md:items-center gap-4">
-        <input type="text" id="search" placeholder="🔍 Search a wish..."
+        <input type="text" id="search" placeholder="🔍 Suche nach Wunsch..."
                class="flex-1 border rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                oninput="filterList()">
         <button id="toggle-filter"
                 class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md">
-          Show filter
+          Filter anzeigen
         </button>
       </div>
 
-      <!-- Fold-out filter menu -->
+      <!-- Ausklappbares Filter-Menü -->
       <div id="filter-menu" class="hidden mt-4 bg-gray-100 dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-        <h2 class="text-xl font-bold mb-4 text-blue-800 dark:text-blue-200">Filter options</h2>
-        <!-- Sorting -->
+        <h2 class="text-xl font-bold mb-4 text-blue-800 dark:text-blue-200">Filter Optionen</h2>
+        <!-- Sortierung -->
         <div class="mb-4">
-          <label for="sort" class="block font-medium text-blue-800 dark:text-blue-200 mb-1">Sorting</label>
+          <label for="sort" class="block font-medium text-blue-800 dark:text-blue-200 mb-1">Sortierung</label>
           <select id="sort"
                   class="w-full border border-blue-300 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   onchange="sortList()">
-            <option value="none">No sorting</option>
-            <option value="asc">Price ↑ Ascending</option>
-            <option value="desc">Price ↓ Descending</option>
+            <option value="none">Keine Sortierung</option>
+            <option value="asc">Preis ↑ Aufsteigend</option>
+            <option value="desc">Preis ↓ Absteigend</option>
           </select>
         </div>
-        <!-- Price filter -->
+        <!-- Preis-Filter -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label for="min-price" class="block font-medium text-blue-800 dark:text-blue-200 mb-1">Min €</label>
@@ -142,28 +142,28 @@ $stmt->close();
                    class="w-full border rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
           </div>
         </div>
-        <!-- Favorites only -->
+        <!-- Nur Favoriten -->
         <div class="mb-4">
           <label class="inline-flex items-center">
             <input type="checkbox" id="favorite-only" class="h-5 w-5 text-blue-600" onchange="filterList()">
-            <span class="ml-2 font-medium text-blue-800 dark:text-blue-200">Favorites only</span>
+            <span class="ml-2 font-medium text-blue-800 dark:text-blue-200">Nur Favoriten</span>
           </label>
         </div>
         <!-- Buttons -->
         <div class="flex gap-4">
           <button onclick="filterList()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex-1">
-            Filter
+            Filtern
           </button>
           <button onclick="resetFilter()"
                   class="bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex-1">
-            Reset
+            Zurücksetzen
           </button>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- Main area: Wish list -->
+  <!-- Hauptbereich: Wunschliste -->
   <main class="max-w-5xl mx-auto px-4 py-8">
     <div id="wishlist" class="space-y-4">
       <?php if ($wishlistResult && $wishlistResult->num_rows > 0): ?>
@@ -184,9 +184,9 @@ $stmt->close();
                  onerror="this.src='<?php echo htmlspecialchars($errimage_url, ENT_QUOTES, 'UTF-8'); ?>';">
             <div class="flex-1">
               <h2 class="text-xl font-semibold"><?php echo $name; ?></h2>
-              <p class="text-gray-600 dark:text-gray-300">Price: €<?php echo $price; ?></p>
+              <p class="text-gray-600 dark:text-gray-300">Preis: €<?php echo $price; ?></p>
               <a href="<?php echo $product_url; ?>"
-                 class="text-blue-600 dark:text-blue-400 hover:underline">To the wish</a>
+                 class="text-blue-600 dark:text-blue-400 hover:underline">Zum Wunsch</a>
             </div>
             <?php if ($isFavorite === '1'): ?>
               <div class="w-12 flex items-center justify-end">
@@ -196,12 +196,12 @@ $stmt->close();
           </div>
         <?php endwhile; ?>
       <?php else: ?>
-        <p class="text-gray-600 dark:text-gray-300">The wish list is currently empty.</p>
+        <p class="text-gray-600 dark:text-gray-300">Die Wunschliste ist derzeit leer.</p>
       <?php endif; ?>
     </div>
   </main>
 
-  <!-- Scroll-to-top button without `hidden` -->
+  <!-- Scroll-to-top Button ohne `hidden` -->
   <button id="scrollToTop"
           class="bg-blue-500 text-white rounded-full p-3 shadow-lg hover:bg-blue-600 transition">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
@@ -249,17 +249,17 @@ $stmt->close();
       });
     }
 
-    // Toggle filter menu
+    // Toggle Filter-Menü
     const toggleFilterBtn = document.getElementById('toggle-filter');
     const filterMenu = document.getElementById('filter-menu');
     toggleFilterBtn.addEventListener('click', () => {
       filterMenu.classList.toggle('hidden');
       toggleFilterBtn.textContent = filterMenu.classList.contains('hidden')
-        ? 'Show filter'
-        : 'Hide filter';
+        ? 'Filter anzeigen'
+        : 'Filter ausblenden';
     });
 
-    // Filter, search & sort functions
+    // Filter-, Such- & Sortierfunktionen
     function filterList() {
       const min = parseFloat(document.getElementById('min-price').value) || 0;
       const max = parseFloat(document.getElementById('max-price').value) || Infinity;
@@ -299,7 +299,7 @@ $stmt->close();
       items.forEach(item => container.appendChild(item));
     }
 
-    // Scroll-to-top functionality
+    // Scroll-to-top Funktionalität
     const scrollBtn = document.getElementById('scrollToTop');
     window.addEventListener('scroll', () => {
       if (window.scrollY > 200) {

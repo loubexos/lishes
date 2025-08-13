@@ -1,18 +1,18 @@
 <?php
 // items.php
 // -------------------
-// Wishlist management with comprehensive protection.
+// Wunschlisten-Verwaltung mit umfassendem Schutz.
 session_start();
-// Generate CSRF token
+// CSRF-Token erzeugen
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
-// CSRF check
+// CSRF-Prüfung
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = $_POST['csrf_token'] ?? '';
     if (!hash_equals($_SESSION['csrf_token'], $token)) {
         http_response_code(400);
-        exit('Invalid CSRF Token');
+        exit('Ungültiger CSRF-Token');
     }
 }
 
@@ -22,7 +22,7 @@ function sanitizeInput(string $data): string {
     return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
 }
 
-// Settings from the DB
+// Einstellungen aus DB
 $errImageUrl    = 'about:blank';
 $faviconUrl     = './fav.svg';
 $bgImageUrl     = '';
@@ -35,7 +35,7 @@ if ($stmtC = $conn->prepare("
      LIMIT 1
 ")) {
     $stmtC->execute();
-    $stmtC->bind_result($dbErrUrl, $dbFaviconUrl, $dbBgUrl, $dbBgEnabled, $dbBgBlur);
+    $stmtC->bind_result($dbErrUrl,$dbFaviconUrl,$dbBgUrl,$dbBgEnabled,$dbBgBlur);
     if ($stmtC->fetch()) {
         if (filter_var($dbErrUrl, FILTER_VALIDATE_URL))    $errImageUrl    = $dbErrUrl;
         if (filter_var($dbFaviconUrl, FILTER_VALIDATE_URL)) $faviconUrl     = $dbFaviconUrl;
@@ -50,7 +50,7 @@ if ($stmtC = $conn->prepare("
     $stmtC->close();
 }
 
-// 1) Save drag & drop order
+// 1) Drag-&-Drop Reihenfolge speichern
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reorder') {
     $ids     = json_decode($_POST['ids'] ?? '[]', true);
     $section = $_POST['section'] ?? '';
@@ -132,26 +132,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reord
     exit;
 }
 
-// 3) Load all items
+// 3) Lade alle Items
 $stmt = $conn->prepare("SELECT * FROM wishlist ORDER BY is_favorite DESC, position ASC");
 $stmt->execute();
 $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 ?>
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="de" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Wishlist Config</title>
+  <title>Wunsch-Config</title>
   <link rel="icon" href="<?= htmlspecialchars($faviconUrl, ENT_QUOTES) ?>" type="image/x-icon">
   <script>tailwind.config = { darkMode: 'class' }</script>
   <script src="../tail.js"></script>
+  <!-- Neuer Style-Bereich für sanfte Übergänge -->
+  <style>
+    /* Sanfte Übergänge für Wunschkarten */
+    .wish-card {
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    /* Ghost-Klasse für das Element während des Drag & Drop */
+    .sortable-ghost {
+      opacity: 0.5;
+    }
+  </style>
 </head>
 <body class="bg-gray-900 text-gray-100 overflow-x-hidden">
 
   <?php if ($bgImageEnabled): ?>
-  <!-- Fixed, blurred background -->
+  <!-- Fixierter, unscharfer Hintergrund -->
   <div
     class="fixed inset-0 z-0 bg-cover bg-center pointer-events-none"
     style="
@@ -165,32 +176,32 @@ $stmt->close();
   <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <!-- Header -->
     <h1 class="text-3xl sm:text-4xl font-bold mb-8 text-center whitespace-nowrap overflow-x-auto">
-      🎁 Wishlist Management
+      🎁 Wunsch-Verwaltung
     </h1>
 
-    <!-- Add New Product -->
+    <!-- Neues Produkt hinzufügen -->
     <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-md p-4 sm:p-6 mb-8">
       <form method="POST" class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-        <input name="name" required placeholder="Product Name"
+        <input name="name" required placeholder="Produktname"
                class="bg-gray-700 placeholder-gray-400 text-gray-100 border border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"/>
-        <input name="price" required type="number" step="0.01" placeholder="Price (€)"
+        <input name="price" required type="number" step="0.01" placeholder="Preis (€)"
                class="bg-gray-700 placeholder-gray-400 text-gray-100 border border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"/>
-        <input name="image_url" type="url" placeholder="Image URL"
+        <input name="image_url" type="url" placeholder="Bild-URL"
                class="bg-gray-700 placeholder-gray-400 text-gray-100 border border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"/>
-        <input name="product_url" type="url" placeholder="Product URL"
+        <input name="product_url" type="url" placeholder="Produkt-URL"
                class="bg-gray-700 placeholder-gray-400 text-gray-100 border border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"/>
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
         <button type="submit"
                 class="sm:col-span-2 md:col-span-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg">
-          Add Product
+          Hinzufügen
         </button>
       </form>
     </div>
 
-    <!-- Favorites -->
+    <!-- Favoriten -->
     <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 sm:p-6 mb-8">
-      <h2 class="text-2xl font-semibold text-gray-100 mb-4">⭐ Favorites</h2>
+      <h2 class="text-2xl font-semibold text-gray-100 mb-4">⭐ Favoriten</h2>
       <div id="favorites-list" class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <?php foreach ($items as $row): 
           if ((int)$row['is_favorite'] === 1): ?>
@@ -206,11 +217,11 @@ $stmt->close();
                class="w-full h-40 object-cover"
                onerror="this.src='<?= htmlspecialchars($errImageUrl, ENT_QUOTES) ?>';">
           <div class="p-3 flex-1 flex flex-col">
-            <h3 class="text-lg font-bold text-gray-100 truncate" title="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"><?=htmlspecialchars($row['name'],ENT_QUOTES) ?></h3>
+			<h3 class="text-lg font-bold text-gray-100 truncate" title="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"><?=htmlspecialchars($row['name'],ENT_QUOTES) ?></h3>
             <p class="mt-1 text-gray-300">€<?= number_format($row['price'], 2, '.', '') ?></p>
             <a href="<?= htmlspecialchars($row['product_url'], ENT_QUOTES) ?>" target="_blank"
                class="mt-2 mb-2 text-center bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
-              View Wish
+              Zum Wunsch
             </a>
             <div class="space-y-2 mt-auto">
               <form method="POST">
@@ -218,19 +229,19 @@ $stmt->close();
                 <input type="hidden" name="id" value="<?= $row['id'] ?>">
                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                 <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg">
-                  Remove from Favorites
+                  Favorit entfernen
                 </button>
               </form>
-              <button onclick='openEditModal(<?= $row['id'] ?>, <?= json_encode($row['name']) ?>, <?= json_encode(number_format($row['price'], 2, ".", "")) ?>, <?= json_encode($row['image_url']) ?>, <?= json_encode($row['product_url']) ?>)'
+              <button onclick='openEditModal(<?= $row['id'] ?>, <?= json_encode($row['name']) ?>, <?= json_encode(number_format($row['price'], 2, '.', '')) ?>, <?= json_encode($row['image_url']) ?>, <?= json_encode($row['product_url']) ?>)'
                       class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">
-                Edit
+                Bearbeiten
               </button>
-              <form method="POST" onsubmit="return confirm('Delete?');">
+              <form method="POST" onsubmit="return confirm('Löschen?');">
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="id" value="<?= $row['id'] ?>">
                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                 <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg">
-                  Delete
+                  Löschen
                 </button>
               </form>
             </div>
@@ -240,9 +251,9 @@ $stmt->close();
       </div>
     </div>
 
-    <!-- Other Wishes -->
+    <!-- Weitere Wünsche -->
     <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 sm:p-6 mb-8">
-      <h2 class="text-2xl font-semibold text-gray-100 mb-4">Other Wishes</h2>
+      <h2 class="text-2xl font-semibold text-gray-100 mb-4">Weitere Wünsche</h2>
       <div id="others-list" class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <?php foreach ($items as $row): 
           if ((int)$row['is_favorite'] === 0): ?>
@@ -258,11 +269,11 @@ $stmt->close();
                class="w-full h-40 object-cover"
                onerror="this.src='<?= htmlspecialchars($errImageUrl, ENT_QUOTES) ?>';">
           <div class="p-3 flex-1 flex flex-col">
-            <h3 class="text-lg font-bold text-gray-100 truncate" title="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"><?=htmlspecialchars($row['name'],ENT_QUOTES) ?></h3>
+			<h3 class="text-lg font-bold text-gray-100 truncate" title="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"><?=htmlspecialchars($row['name'],ENT_QUOTES) ?></h3>
             <p class="mt-1 text-gray-300">€<?= number_format($row['price'], 2, '.', '') ?></p>
             <a href="<?= htmlspecialchars($row['product_url'], ENT_QUOTES) ?>" target="_blank"
                class="mt-2 mb-2 text-center bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
-              View Wish
+              Zum Wunsch
             </a>
             <div class="space-y-2 mt-auto">
               <form method="POST">
@@ -270,19 +281,19 @@ $stmt->close();
                 <input type="hidden" name="id" value="<?= $row['id'] ?>">
                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                 <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg">
-                  Set as Favorite
+                  Als Favorit setzen
                 </button>
               </form>
-              <button onclick='openEditModal(<?= $row['id'] ?>, <?= json_encode($row['name']) ?>, <?= json_encode(number_format($row['price'], 2, ".", "")) ?>, <?= json_encode($row['image_url']) ?>, <?= json_encode($row['product_url']) ?>)'
+              <button onclick='openEditModal(<?= $row['id'] ?>, <?= json_encode($row['name']) ?>, <?= json_encode(number_format($row['price'], 2, '.', '')) ?>, <?= json_encode($row['image_url']) ?>, <?= json_encode($row['product_url']) ?>)'
                       class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">
-                Edit
+                Bearbeiten
               </button>
-              <form method="POST" onsubmit="return confirm('Delete?');">
+              <form method="POST" onsubmit="return confirm('Löschen?');">
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="id" value="<?= $row['id'] ?>">
                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                 <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg">
-                  Delete
+                  Löschen
                 </button>
               </form>
             </div>
@@ -302,7 +313,7 @@ $stmt->close();
     <!-- Scroll-to-Top Button -->
     <button id="scrollToTopBtn"
             class="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none"
-            aria-label="Scroll to top">
+            aria-label="Nach oben scrollen">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
            viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -312,31 +323,31 @@ $stmt->close();
 
   </div>
 
-  <!-- Edit Modal Popup – responsive for small screens -->
+  <!-- Edit Modal Popup – responsiv für kleine Bildschirme -->
   <div id="editModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen px-4">
       <div class="fixed inset-0 bg-gray-900 opacity-50"></div>
       <div class="bg-gray-800 relative z-10 rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-lg">
-        <h3 class="text-2xl mb-4 text-gray-100">Edit Wish</h3>
+        <h3 class="text-2xl mb-4 text-gray-100">Wunsch bearbeiten</h3>
         <form id="editForm" method="POST" class="space-y-3">
           <input type="hidden" name="action" value="edit">
           <input type="hidden" name="id" id="edit-id" value="">
           <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
           <input type="text" name="name" id="edit-name" placeholder="Name"
                  class="w-full bg-gray-600 border border-gray-500 rounded p-2 text-gray-100" required>
-          <input type="number" step="0.01" name="price" id="edit-price" placeholder="Price (€)"
+          <input type="number" step="0.01" name="price" id="edit-price" placeholder="Preis (€)"
                  class="w-full bg-gray-600 border border-gray-500 rounded p-2 text-gray-100" required>
-          <input type="url" name="image_url" id="edit-image_url" placeholder="Image URL"
+          <input type="url" name="image_url" id="edit-image_url" placeholder="Bild-URL"
                  class="w-full bg-gray-600 border border-gray-500 rounded p-2 text-gray-100">
-          <input type="url" name="product_url" id="edit-product_url" placeholder="Product URL"
+          <input type="url" name="product_url" id="edit-product_url" placeholder="Produkt-URL"
                  class="w-full bg-gray-600 border border-gray-500 rounded p-2 text-gray-100">
           <div class="flex gap-2">
             <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">
-              Save
+              Speichern
             </button>
             <button type="button" onclick="closeEditModal()"
                     class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg">
-              Cancel
+              Abbrechen
             </button>
           </div>
         </form>
@@ -344,17 +355,18 @@ $stmt->close();
     </div>
   </div>
 
-  <!-- Script Section: Drag & Drop, Scroll Position Persistence, and Modal Functionality -->
+  <!-- Script-Bereich: Drag & Drop, Scroll-Speicherung und Modal-Funktionalität -->
   <script>
     const CSRF_TOKEN = '<?= $_SESSION['csrf_token'] ?>';
     document.addEventListener('DOMContentLoaded', () => {
-      // Initialize Sortable for both lists
+      // Initialisiere Sortable für beide Listen mit sanfter Animation
       ['favorites-list','others-list'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         Sortable.create(el, {
-          animation: 150,
+          animation: 300, // Angepasste Animationsdauer für sanfte Verschiebung
           handle: '.drag-handle',
+          ghostClass: 'sortable-ghost', // Klasse für das Ghost-Element
           onEnd: () => {
             const ids = Array.from(el.querySelectorAll('.wish-card')).map(c => c.dataset.id);
             const params = new URLSearchParams({
@@ -384,7 +396,7 @@ $stmt->close();
       });
     });
 
-    // Opens the edit modal and fills the fields
+    // Öffnet das Bearbeitungs-Popup und füllt die Felder
     function openEditModal(id, name, price, image_url, product_url) {
       document.getElementById('edit-id').value = id;
       document.getElementById('edit-name').value = name;
@@ -394,17 +406,17 @@ $stmt->close();
       document.getElementById('editModal').classList.remove('hidden');
     }
 
-    // Closes the edit modal
+    // Schließt das Bearbeitungs-Popup
     function closeEditModal() {
       document.getElementById('editModal').classList.add('hidden');
     }
 
-    // Saves the current scroll position before leaving the page
+    // Speichert die aktuelle Scrollposition bevor die Seite verlassen wird
     window.addEventListener('beforeunload', function() {
       sessionStorage.setItem("scrollpos", window.scrollY);
     });
 
-    // Restores the saved scroll position when the page loads
+    // Stellt beim Laden der Seite die gespeicherte Scrollposition wieder her
     document.addEventListener('DOMContentLoaded', function() {
       const scrollPos = sessionStorage.getItem("scrollpos");
       if (scrollPos !== null) {
