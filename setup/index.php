@@ -111,7 +111,9 @@ $schemas = [
       "image_url VARCHAR(255)",
       "product_url VARCHAR(255)",
       "is_favorite BOOLEAN DEFAULT FALSE",
-      "position INT NOT NULL DEFAULT 0"
+      "position INT NOT NULL DEFAULT 0",
+      /* NEU: individuelle Wunsch-Farbe (HEX) */
+      "color_hex VARCHAR(7) NULL"
     ]
   ],
   'customization_settings' => [
@@ -130,7 +132,10 @@ $schemas = [
         active TINYINT(1) NOT NULL DEFAULT 0
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ",
-    'columns' => []
+    'columns' => [
+      /* NEU: Favoriten-Randfarbe per Preset (HEX, z.B. "#facc15") */
+      "favorite_border_hex VARCHAR(7) NOT NULL DEFAULT '#facc15'"
+    ]
   ]
 ];
 

@@ -11,11 +11,9 @@ function sanitize_input($input) {
 }
 
 // Sicherstellen, dass die Preset-Blöcke (IDs 1 bis 10) existieren.
-// Hier wird ein vorbereiteter Statement verwendet, um die Insert-Operation abzusichern.
-$stmtInsert = $conn->prepare("INSERT INTO customization_settings (id, preset_name, active, bg_image_enabled, bg_image_url, dark_mode_switch_enabled, default_mode, header_title, favicon_url, errimage_url, bg_blur)
-                               VALUES (?, ?, ?, 0, '', 1, 'system', 'Wunschliste NAME 🎁', '', '', 0)");
+$stmtInsert = $conn->prepare("INSERT INTO customization_settings (id, preset_name, active, bg_image_enabled, bg_image_url, dark_mode_switch_enabled, default_mode, header_title, favicon_url, errimage_url, bg_blur, favorite_border_hex)
+                               VALUES (?, ?, ?, 0, '', 1, 'system', 'Wunschliste NAME 🎁', '', '', 0, '#facc15')");
 for ($i = 1; $i <= 10; $i++) {
-    // Prüfe, ob das Preset bereits existiert
     $stmtCheck = $conn->prepare("SELECT id FROM customization_settings WHERE id = ?");
     $stmtCheck->bind_param("i", $i);
     $stmtCheck->execute();
@@ -30,12 +28,9 @@ for ($i = 1; $i <= 10; $i++) {
 }
 $stmtInsert->close();
 
-
-// Standardmäßig wird Preset 1 geladen, falls kein GET-Parameter vorhanden ist
 $preset_id = isset($_GET['preset_id']) ? (int)$_GET['preset_id'] : 1;
 
 $message = '';
-// Formularverarbeitung: Änderungen werden nur übernommen, wenn "Speichern" geklickt wurde
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $preset_id                = (int) $_POST['preset_id'];
     $bg_image_enabled         = isset($_POST['bg_image_enabled']) ? 1 : 0;
@@ -45,21 +40,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $default_mode             = in_array($_POST['default_mode'] ?? 'system', ['light', 'dark', 'system']) ? $_POST['default_mode'] : 'system';
     $header_title             = sanitize_input($_POST['header_title'] ?? '');
     $favicon_url              = sanitize_input($_POST['favicon_url'] ?? '');
-    $errimage_url          = sanitize_input($_POST['errimage_url'] ?? '');
+    $errimage_url             = sanitize_input($_POST['errimage_url'] ?? '');
     $preset_name              = sanitize_input($_POST['preset_name'] ?? '');
+    $favorite_border_hex      = sanitize_input($_POST['favorite_border_hex'] ?? '#facc15');
     $active                   = isset($_POST['active']) ? 1 : 0;
     
-    // Wird dieses Preset als aktiv markiert, deaktiviere alle anderen (IDs 1 bis 10)
     if ($active === 1) {
         $conn->query("UPDATE customization_settings SET active = 0 WHERE id BETWEEN 1 AND 10");
     }
 
-    // Aktualisierung der Preset-Daten per prepared Statement
     $stmt = $conn->prepare("UPDATE customization_settings 
                             SET bg_image_enabled = ?, bg_image_url = ?, bg_blur = ?, dark_mode_switch_enabled = ?, 
-                                default_mode = ?, header_title = ?, favicon_url = ?, errimage_url = ?, preset_name = ?, active = ? 
+                                default_mode = ?, header_title = ?, favicon_url = ?, errimage_url = ?, preset_name = ?, favorite_border_hex = ?, active = ? 
                             WHERE id = ?");
-    $stmt->bind_param("isissssssii",
+    $stmt->bind_param("isissssssssi",
                       $bg_image_enabled,
                       $bg_image_url,
                       $bg_blur,
@@ -67,25 +61,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                       $default_mode,
                       $header_title,
                       $favicon_url,
-					  $errimage_url,
+                      $errimage_url,
                       $preset_name,
+                      $favorite_border_hex,
                       $active,
                       $preset_id);
     $stmt->execute();
     $stmt->close();
     
-    // Erfolgsmeldung in der Variablen speichern
     $message = "Preset-Einstellungen erfolgreich gespeichert.";
 }
 
-// Aktuelle Presetdaten laden
 $stmt = $conn->prepare("SELECT * FROM customization_settings WHERE id = ?");
 $stmt->bind_param("i", $preset_id);
 $stmt->execute();
 $presetData = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-// Alle Presets (IDs 1 bis 10) für das Dropdown abrufen
 $result = $conn->query("SELECT id, preset_name FROM customization_settings WHERE id BETWEEN 1 AND 10 ORDER BY id ASC");
 $allPresets = $result->fetch_all(MYSQLI_ASSOC);
 ?>
@@ -96,7 +88,6 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Einstellungen</title>
 
-  <!-- Favicon dynamisch setzen -->
   <?php if (!empty($favicon_url)): ?>
     <link rel="icon" href="<?php echo htmlspecialchars($favicon_url, ENT_QUOTES, 'UTF-8'); ?>" type="image/x-icon">
   <?php else: ?>
@@ -105,21 +96,14 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
 
   <script src="../tail.js"></script>
   <script>
-    // Aktiviert den Dark Mode
     document.documentElement.classList.add('dark');
-    
-    // Wechselt das angezeigte Preset bei Auswahl
     function changePreset(selectObj) {
       var presetId = selectObj.value;
       window.location.href = "customization.php?preset_id=" + presetId;
     }
-    
-    // Aktualisiert den angezeigten Blur-Wert
     function updateBlurValue(val) {
       document.getElementById('blurValue').innerText = val + " px";
     }
-    
-    // Blendet die Erfolgsmeldung nach 3 Sekunden aus
     window.addEventListener('DOMContentLoaded', function() {
       var successMessage = document.getElementById('successMessage');
       if (successMessage) {
@@ -133,17 +117,12 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
     });
   </script>
   <style>
-    /* Zusätzliche Transition-Styles für die Erfolgsmeldung */
-    #successMessage {
-      transition: opacity 0.5s ease;
-    }
+    #successMessage { transition: opacity 0.5s ease; }
   </style>
 </head>
 <body class="bg-gray-900 text-gray-100">
   <div class="min-h-screen flex items-center justify-center p-6">
     <div class="w-full max-w-3xl">
-      
-      <!-- Überschrift und Erfolgsmeldung -->
       <div class="mb-8 text-center">
         <h1 class="text-4xl font-extrabold mb-2">Wunschlisten Design Einstellungen</h1>
         <?php if ($message): ?>
@@ -153,7 +132,6 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
         <?php endif; ?>
       </div>
       
-      <!-- Preset-Auswahl Dropdown -->
       <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6">
         <label for="preset_selector" class="block text-lg font-semibold mb-2">Preset auswählen</label>
         <select id="preset_selector" class="w-full p-3 rounded bg-gray-700 text-gray-100" onchange="changePreset(this)">
@@ -165,11 +143,9 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
         </select>
       </div>
       
-      <!-- Formular zur Bearbeitung der Einstellungen -->
       <form action="customization.php?preset_id=<?= $presetData['id']; ?>" method="POST">
         <input type="hidden" name="preset_id" value="<?= $presetData['id']; ?>">
         
-        <!-- Allgemeine Einstellungen -->
         <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6">
           <h2 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Allgemeine Einstellungen</h2>
           <div class="mb-4">
@@ -194,7 +170,6 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
           </div>
         </div>
         
-        <!-- Hintergrund Einstellungen -->
         <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6">
           <h2 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Hintergrund Einstellungen</h2>
           <div class="flex items-center mb-4">
@@ -203,18 +178,15 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
           </div>
           <div class="mb-4">
             <label for="bg_image_url" class="block text-lg font-medium mb-1">URL des Hintergrundbildes</label>
-            <input type="text" id="bg_image_url" name="bg_image_url" placeholder="https://example.com/hintergrund.jpg" 
-                   value="<?= htmlspecialchars($presetData['bg_image_url'], ENT_QUOTES, 'UTF-8'); ?>" class="w-full p-3 rounded bg-gray-700 text-gray-100">
+            <input type="text" id="bg_image_url" name="bg_image_url" value="<?= htmlspecialchars($presetData['bg_image_url'], ENT_QUOTES, 'UTF-8'); ?>" class="w-full p-3 rounded bg-gray-700 text-gray-100">
           </div>
           <div class="mb-4">
             <label for="bg_blur" class="block text-lg font-medium mb-1">Hintergrund Blur</label>
-            <input type="range" id="bg_blur" name="bg_blur" min="0" max="20" step="1" 
-                   value="<?= htmlspecialchars($presetData['bg_blur'], ENT_QUOTES, 'UTF-8'); ?>" oninput="updateBlurValue(this.value)" class="w-full">
+            <input type="range" id="bg_blur" name="bg_blur" min="0" max="20" step="1" value="<?= htmlspecialchars($presetData['bg_blur'], ENT_QUOTES, 'UTF-8'); ?>" oninput="updateBlurValue(this.value)" class="w-full">
             <p class="mt-2 text-sm text-gray-400">Aktueller Blur-Wert: <span id="blurValue"><?= htmlspecialchars($presetData['bg_blur'], ENT_QUOTES, 'UTF-8'); ?> px</span></p>
           </div>
         </div>
         
-        <!-- Design Optionen -->
         <div class="bg-gray-800 p-6 rounded-lg shadow-md mb-6">
           <h2 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Design Optionen</h2>
           <div class="flex items-center mb-4">
@@ -229,6 +201,11 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
               <option value="system" <?= ($presetData['default_mode'] === 'system') ? 'selected' : ''; ?>>System</option>
             </select>
           </div>
+          <div class="mb-4">
+            <label for="favorite_border_hex" class="block text-lg font-medium mb-1">Favoriten Rahmenfarbe (HEX)</label>
+            <input type="color" id="favorite_border_hex" name="favorite_border_hex" value="<?= htmlspecialchars($presetData['favorite_border_hex'] ?? '#facc15', ENT_QUOTES, 'UTF-8'); ?>" class="w-16 h-10 p-0 border border-gray-500 rounded">
+            <input type="text" name="favorite_border_hex_text" value="<?= htmlspecialchars($presetData['favorite_border_hex'] ?? '#facc15', ENT_QUOTES, 'UTF-8'); ?>" class="ml-2 p-2 rounded bg-gray-700 text-gray-100" oninput="document.getElementById('favorite_border_hex').value=this.value">
+          </div>
         </div>
         
         <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-xl font-semibold">
@@ -238,12 +215,10 @@ $allPresets = $result->fetch_all(MYSQLI_ASSOC);
     </div>
   </div>
 
-  <!-- Footer mit dynamischem Jahr und verlinktem Text -->
   <footer class="text-center text-xs sm:text-sm py-4">
     © <span id="year"></span> <a href="https://www.hocunity.net" target="_blank" rel="noopener noreferrer" class="hover:underline">HocunityNET</a>. All rights reserved.
   </footer>
   
-  <!-- Skript zum automatischen Setzen des aktuellen Jahres -->
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
   </script>
