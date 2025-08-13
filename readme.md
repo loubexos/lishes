@@ -35,5 +35,4 @@ cd <your folder name>
 ## Planned
 - Administration panel login protection
 - Custom currencies
-- Color categorization of wishes
 - some more...
