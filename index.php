@@ -33,7 +33,7 @@ $bgImageUrl     = $activePreset['bg_image_url'];
 $bg_blur        = (int)$activePreset['bg_blur'];
 
 /**
- * NEU: Favoriten-Randfarbe aus Preset (DB) – per HEX konfigurierbar.
+ * Favoriten-Randfarbe aus Preset (DB) – per HEX konfigurierbar.
  * Fällt zurück auf das bisherige Gelb (#facc15), wenn DB-Wert fehlt/ungültig.
  */
 $favBorderHexRaw = $activePreset['favorite_border_hex'] ?? '#facc15';
@@ -67,13 +67,6 @@ $stmt->close();
     /* Globale Transitions */
     .transition-all { transition: all 0.3s ease-in-out; }
 
-    /**
-     * HINWEIS:
-     * Die frühere feste Favoriten-Borderfarbe wurde entfernt.
-     * Der Rahmen (Farbe & Sichtbarkeit) wird jetzt dynamisch über data-Attribute + JS gesetzt,
-     * damit sowohl Favoriten- als auch individuelle Wunsch-Farben aus der DB kommen können.
-     */
-
     /* Hintergrund-Overlay für das Hintergrundbild */
     #background-overlay {
       position: fixed;
@@ -89,8 +82,8 @@ $stmt->close();
     /* Smooth Scroll-To-Top Button */
     #scrollToTop {
       position: fixed;
-      bottom: 1.5rem; /* entspricht bottom-6 */
-      right: 1.5rem;  /* entspricht right-6 */
+      bottom: 1.5rem; /* ist bottom-6 */
+      right: 1.5rem;  /* ist right-6 */
       opacity: 0;
       transform: translateY(20px);
       transition: opacity 0.3s ease, transform 0.3s ease;
@@ -133,7 +126,7 @@ $stmt->close();
   <header class="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 shadow">
     <div class="max-w-5xl mx-auto px-4 py-8">
       <div class="flex flex-row items-center justify-between gap-4">
-        <h1 class="text-3xl font-bold flex-1"><?php echo $headerTitle; ?></h1>
+        <h1 class="text-3xl font-bold flex-1 text-center"><?php echo $headerTitle; ?></h1>
         <button id="toggle-theme"
                 class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white px-3 py-1 rounded-md whitespace-nowrap">
           🌓
@@ -219,11 +212,6 @@ $stmt->close();
           $image_url   = htmlspecialchars($row['image_url'], ENT_QUOTES, 'UTF-8');
           $product_url = htmlspecialchars($row['product_url'], ENT_QUOTES, 'UTF-8');
           $isFavorite  = (isset($row['is_favorite']) && $row['is_favorite']) ? '1' : '0';
-
-          /**
-           * NEU: individuelle Wunsch-Farbe aus DB (Spalte: color_hex)
-           * Falls leer/ungültig => kein individueller Rahmen.
-           */
           $wishColorRaw = $row['color_hex'] ?? null;
           $wishColorHex = sanitize_hex($wishColorRaw);
           
@@ -234,19 +222,36 @@ $stmt->close();
 
           // Für JS/Filter als Datenattribut durchreichen
           $dataColor = ($isFavorite === '1') ? $favBorderHex : ($wishColorHex ?? '');
+
+          // NEU: img_fit aus DB (0 = cover (Standard), 1 = contain)
+          $imgFit = (isset($row['img_fit']) && (int)$row['img_fit'] === 1) ? '1' : '0';
         ?>
           <div class="wishlist-item relative bg-white dark:bg-gray-800 p-4 rounded-xl shadow flex flex-wrap items-center gap-4"
                data-price="<?php echo $price; ?>"
                data-name="<?php echo strtolower($name); ?>"
                data-favorite="<?php echo $isFavorite; ?>"
                data-color="<?php echo htmlspecialchars($dataColor, ENT_QUOTES, 'UTF-8'); ?>"
+               data-img-fit="<?php echo $imgFit; ?>"
                style="border-color: <?php echo htmlspecialchars($finalBorderColor, ENT_QUOTES, 'UTF-8'); ?>;">
             <span class="color-badge" style="background: <?php echo htmlspecialchars($dataColor ?: 'transparent', ENT_QUOTES, 'UTF-8'); ?>;"></span>
 
-            <img src="<?php echo $image_url; ?>"
-                 alt="<?php echo $name; ?>"
-                 class="w-24 h-24 object-cover rounded-lg"
-                 onerror="this.src='<?php echo htmlspecialchars($errimage_url, ENT_QUOTES, 'UTF-8'); ?>';">
+            <!-- Bild-Wrapper: fester Kasten, Bild-Verhalten abhängig von img_fit -->
+            <div class="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+              <?php if ($imgFit === '1'): ?>
+                <!-- img_fit = 1 -> gesamtes Bild sichtbar (contain) -->
+                <img src="<?php echo $image_url; ?>"
+                     alt="<?php echo $name; ?>"
+                     class="max-w-full max-h-full object-contain block"
+                     onerror="this.src='<?php echo htmlspecialchars($errimage_url, ENT_QUOTES, 'UTF-8'); ?>';">
+              <?php else: ?>
+                <!-- img_fit = 0 -> Kasten immer gefüllt (cover) -->
+                <img src="<?php echo $image_url; ?>"
+                     alt="<?php echo $name; ?>"
+                     class="w-full h-full object-cover block"
+                     onerror="this.src='<?php echo htmlspecialchars($errimage_url, ENT_QUOTES, 'UTF-8'); ?>';">
+              <?php endif; ?>
+            </div>
+
             <div class="flex-1">
               <h2 class="text-xl font-semibold"><?php echo $name; ?></h2>
               <p class="text-gray-600 dark:text-gray-300">Preis: €<?php echo $price; ?></p>

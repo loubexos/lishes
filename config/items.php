@@ -1,5 +1,5 @@
 <?php
-// items.php - Updated: Clear color buttons validate like save buttons (no empty wishes)
+// items.php - Updated: img_fit support (0 = cover (default), 1 = contain)
 session_start();
 // CSRF-Token erzeugen
 if (empty($_SESSION['csrf_token'])) {
@@ -66,7 +66,6 @@ if (!isset($_SESSION['old_input'])) $_SESSION['old_input'] = [];
 
 /**
  * 1) Drag-&-Drop Reihenfolge speichern
- * (unverändert)
  */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reorder') {
     $ids     = json_decode($_POST['ids'] ?? '[]', true);
@@ -89,8 +88,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reord
 }
 
 /**
- * 2) CRUD & toggle_favorite (inkl. color_hex speichern und clear_color Handling)
- *    -> Serverseitige Validierung: keine leeren Wünsche erlaubt
+ * 2) CRUD & toggle_favorite (inkl. color_hex und img_fit speichern)
+ *    -> Serverseitige Validierung
  */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reorder') {
     $action = $_POST['action'];
@@ -106,6 +105,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reord
         $productRaw  = $_POST['product_url'] ?? '';
         $color_raw   = $_POST['color_hex'] ?? null;
         $clear_color = (isset($_POST['clear_color']) && $_POST['clear_color'] === '1');
+        // img_fit checkbox: 1 = contain, 0 = cover
+        $img_fit_raw = $_POST['img_fit'] ?? null;
+        $img_fit = ($img_fit_raw === '1') ? 1 : 0;
 
         // Serverseitige Validierung (Name required, Price required & numeric)
         $errors = [];
@@ -127,7 +129,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reord
             'price' => $priceRaw,
             'image_url' => $imageRaw,
             'product_url' => $productRaw,
-            'color_hex' => $color_raw ?? ''
+            'color_hex' => $color_raw ?? '',
+            'img_fit' => $img_fit
         ];
 
         if (!empty($errors)) {
@@ -147,10 +150,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reord
         $newPos    = (int)$maxPosRes->fetch_assoc()['maxpos'] + 1;
 
         $stmt = $conn->prepare("
-            INSERT INTO wishlist (name, price, image_url, product_url, is_favorite, position, color_hex)
-            VALUES (?, ?, ?, ?, FALSE, ?, ?)
+            INSERT INTO wishlist (name, price, image_url, product_url, is_favorite, position, color_hex, img_fit)
+            VALUES (?, ?, ?, ?, FALSE, ?, ?, ?)
         ");
-        $stmt->bind_param('ssssis', $name, $price, $image_url, $product_url, $newPos, $color_hex);
+        // types: name s, price s, image_url s, product_url s, position i, color_hex s, img_fit i
+        $stmt->bind_param('ssssisi', $name, $price, $image_url, $product_url, $newPos, $color_hex, $img_fit);
         $stmt->execute();
         $stmt->close();
 
@@ -164,6 +168,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reord
         $productRaw  = $_POST['product_url'] ?? '';
         $color_raw   = $_POST['color_hex'] ?? null;
         $clear_color = (isset($_POST['clear_color']) && $_POST['clear_color'] === '1');
+        $img_fit_raw = $_POST['img_fit'] ?? null;
+        $img_fit = ($img_fit_raw === '1') ? 1 : 0;
 
         $errors = [];
         $id = filter_var($idRaw, FILTER_VALIDATE_INT);
@@ -186,7 +192,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reord
             'price' => $priceRaw,
             'image_url' => $imageRaw,
             'product_url' => $productRaw,
-            'color_hex' => $color_raw ?? ''
+            'color_hex' => $color_raw ?? '',
+            'img_fit' => $img_fit
         ];
 
         if (!empty($errors)) {
@@ -202,10 +209,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reord
 
         $stmt = $conn->prepare("
             UPDATE wishlist
-               SET name = ?, price = ?, image_url = ?, product_url = ?, color_hex = ?
+               SET name = ?, price = ?, image_url = ?, product_url = ?, color_hex = ?, img_fit = ?
              WHERE id = ?
         ");
-        $stmt->bind_param('sssssi', $name, $price, $image_url, $product_url, $color_hex, $id);
+        // types: name s, price s, image_url s, product_url s, color_hex s, img_fit i, id i
+        $stmt->bind_param('sssssii', $name, $price, $image_url, $product_url, $color_hex, $img_fit, $id);
         $stmt->execute();
         $stmt->close();
 
@@ -231,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'reord
 }
 
 /**
- * 3) Lade alle Items (inkl. color_hex)
+ * 3) Lade alle Items (inkl. color_hex, img_fit)
  */
 $stmt = $conn->prepare("SELECT * FROM wishlist ORDER BY is_favorite DESC, position ASC");
 $stmt->execute();
@@ -262,7 +270,26 @@ $stmt->close();
   <?php endif; ?>
 
   <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <h1 class="text-3xl sm:text-4xl font-bold mb-8 text-center whitespace-nowrap overflow-x-auto">🎁 Wunsch-Verwaltung</h1>
+
+    <!-- BACK BUTTON + TITLE IN ONE ROW (responsive, mobile-friendly) -->
+    <div class="mb-8">
+      <div class="flex items-center gap-4">
+        <!-- Back button: bleibt links, shrink-0 damit er nicht zuschiebt -->
+        <button type="button"
+                onclick="window.history.back()"
+                aria-label="Zurück"
+                class="shrink-0 inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-gray-100 py-2 px-3 rounded-lg shadow-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span class="font-medium text-sm">Zurück</span>
+        </button>
+
+        <!-- Titel: flex-1 sorgt dafür, dass er den verfügbaren Raum nutzt -->
+        <!-- text-center hält die Überschrift zentriert, auch wenn Button links ist -->
+        <h1 class="flex-1 text-2xl sm:text-3xl md:text-4xl font-bold text-center">🎁 Wunsch-Verwaltung</h1>
+      </div>
+    </div>
 
     <!-- Show errors from previous submit (if any) -->
     <?php if (!empty($_SESSION['form_errors'])): ?>
@@ -290,6 +317,7 @@ $stmt->close();
         $oldImage = htmlspecialchars($old['image_url'] ?? '', ENT_QUOTES);
         $oldProduct = htmlspecialchars($old['product_url'] ?? '', ENT_QUOTES);
         $oldColor = htmlspecialchars($old['color_hex'] ?? '#ffffff', ENT_QUOTES);
+        $oldImgFit = isset($old['img_fit']) && (int)$old['img_fit'] === 1 ? 1 : 0;
         // clear old_input so it doesn't persist unnecessarily
         $_SESSION['old_input'] = [];
       ?>
@@ -307,14 +335,20 @@ $stmt->close();
           <input id="add-color-picker" type="color" value="<?= ($oldColor ?: '#ffffff') ?>" class="bg-gray-700 border border-gray-600 rounded-lg p-1 w-12" />
           <input id="add-color-hidden" name="color_hex" type="hidden" value="<?= ($oldColor ?: '#ffffff') ?>" />
           <input id="add-clear-color" name="clear_color" type="hidden" value="0" />
-          <button type="button" onclick="clearAddColor()" class="bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg">Farbe löschen</button>
+          <button type="button" onclick="clearAddColor()" class="bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg">Keine Farbe</button>
         </div>
+
+        <!-- IMG_FIT Checkbox: 1 = contain (Ganzes Bild sehen), 0 = cover (Kasten füllen) -->
+        <label class="flex items-center gap-2">
+          <input type="checkbox" name="img_fit" value="1" <?= $oldImgFit ? 'checked' : '' ?> />
+          <span class="text-sm text-gray-300">Ganzes Bild anzeigen</span>
+        </label>
 
         <input type="hidden" name="action" value="add">
         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
         <button type="submit" class="sm:col-span-2 md:col-span-6 w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg">Hinzufügen</button>
       </form>
-      <p class="mt-2 text-sm text-gray-400">Farbe wird als Rahmenfarbe angezeigt. Favoriten verwenden die Preset-Farbe.</p>
+      <p class="mt-2 text-sm text-gray-400">Farbe wird als Rahmenfarbe angezeigt. Favoriten verwenden die Preset-Farbe in den design settings.</p>
     </div>
 
     <!-- Favoriten -->
@@ -326,6 +360,7 @@ $stmt->close();
             $itemColor = isValidHex($row['color_hex'] ?? null) ? strtoupper($row['color_hex']) : null;
             $borderColor = $favBorderHex;
             $badgeColor  = $itemColor ?: $favBorderHex;
+            $imgFitFlag  = (isset($row['img_fit']) && (int)$row['img_fit'] === 1) ? 1 : 0;
         ?>
         <div class="wish-card relative flex flex-col bg-gray-700 rounded-lg shadow-md transition transform hover:-translate-y-1"
              data-id="<?= $row['id'] ?>" style="border-color: <?= htmlspecialchars($borderColor, ENT_QUOTES) ?>;">
@@ -337,10 +372,13 @@ $stmt->close();
           <?php if ($badgeColor): ?>
             <span class="color-badge" style="background: <?= htmlspecialchars($badgeColor, ENT_QUOTES) ?>;"></span>
           <?php endif; ?>
+
+          <!-- Bild: object-fit steuert cover/contain -->
           <img src="<?= htmlspecialchars($row['image_url'], ENT_QUOTES) ?>"
                alt="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"
-               class="w-full h-40 object-cover"
+               class="w-full h-40 <?= $imgFitFlag ? 'object-contain' : 'object-cover' ?>"
                onerror="this.src='<?= htmlspecialchars($errImageUrl, ENT_QUOTES) ?>';">
+
           <div class="p-3 flex-1 flex flex-col">
             <h3 class="text-lg font-bold text-gray-100 truncate" title="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"><?=htmlspecialchars($row['name'],ENT_QUOTES) ?></h3>
             <p class="mt-1 text-gray-300">€<?= number_format($row['price'], 2, '.', '') ?></p>
@@ -352,7 +390,7 @@ $stmt->close();
                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                 <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg">Favorit entfernen</button>
               </form>
-              <button onclick='openEditModal(<?= $row['id'] ?>, <?= json_encode($row['name']) ?>, <?= json_encode(number_format($row['price'], 2, '.', '')) ?>, <?= json_encode($row['image_url']) ?>, <?= json_encode($row['product_url']) ?>, <?= json_encode($row['color_hex'] ?? '') ?>)'
+              <button onclick='openEditModal(<?= $row['id'] ?>, <?= json_encode($row['name']) ?>, <?= json_encode(number_format($row['price'], 2, '.', '')) ?>, <?= json_encode($row['image_url']) ?>, <?= json_encode($row['product_url']) ?>, <?= json_encode($row['color_hex'] ?? '') ?>, <?= json_encode((int)($row['img_fit'] ?? 0)) ?>)'
                       class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Bearbeiten</button>
               <form method="POST" onsubmit="return confirm('Löschen?');">
                 <input type="hidden" name="action" value="delete">
@@ -376,13 +414,17 @@ $stmt->close();
             $itemColor = isValidHex($row['color_hex'] ?? null) ? strtoupper($row['color_hex']) : null;
             $borderColor = $itemColor ?: 'transparent';
             $badgeColor  = $itemColor;
+            $imgFitFlag  = (isset($row['img_fit']) && (int)$row['img_fit'] === 1) ? 1 : 0;
         ?>
         <div class="wish-card relative flex flex-col bg-gray-700 rounded-lg shadow-md transition transform hover:-translate-y-1" data-id="<?= $row['id'] ?>" style="border-color: <?= htmlspecialchars($borderColor, ENT_QUOTES) ?>;">
           <div class="drag-handle absolute top-2 left-2 p-2 cursor-move text-gray-400 hover:text-gray-200">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor"><path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0zm6 0a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
           </div>
           <?php if ($badgeColor): ?><span class="color-badge" style="background: <?= htmlspecialchars($badgeColor, ENT_QUOTES) ?>;"></span><?php endif; ?>
-          <img src="<?= htmlspecialchars($row['image_url'], ENT_QUOTES) ?>" alt="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>" class="w-full h-40 object-cover" onerror="this.src='<?= htmlspecialchars($errImageUrl, ENT_QUOTES) ?>';">
+
+          <!-- Bild: object-fit steuert cover/contain -->
+          <img src="<?= htmlspecialchars($row['image_url'], ENT_QUOTES) ?>" alt="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>" class="w-full h-40 <?= $imgFitFlag ? 'object-contain' : 'object-cover' ?>" onerror="this.src='<?= htmlspecialchars($errImageUrl, ENT_QUOTES) ?>';">
+
           <div class="p-3 flex-1 flex flex-col">
             <h3 class="text-lg font-bold text-gray-100 truncate" title="<?= htmlspecialchars($row['name'], ENT_QUOTES) ?>"><?=htmlspecialchars($row['name'],ENT_QUOTES) ?></h3>
             <p class="mt-1 text-gray-300">€<?= number_format($row['price'], 2, '.', '') ?></p>
@@ -394,7 +436,7 @@ $stmt->close();
                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                 <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg">Als Favorit setzen</button>
               </form>
-              <button onclick='openEditModal(<?= $row['id'] ?>, <?= json_encode($row['name']) ?>, <?= json_encode(number_format($row['price'], 2, '.', '')) ?>, <?= json_encode($row['image_url']) ?>, <?= json_encode($row['product_url']) ?>, <?= json_encode($row['color_hex'] ?? '') ?>)'
+              <button onclick='openEditModal(<?= $row['id'] ?>, <?= json_encode($row['name']) ?>, <?= json_encode(number_format($row['price'], 2, '.', '')) ?>, <?= json_encode($row['image_url']) ?>, <?= json_encode($row['product_url']) ?>, <?= json_encode($row['color_hex'] ?? '') ?>, <?= json_encode((int)($row['img_fit'] ?? 0)) ?>)'
                       class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Bearbeiten</button>
               <form method="POST" onsubmit="return confirm('Löschen?');">
                 <input type="hidden" name="action" value="delete">
@@ -442,8 +484,14 @@ $stmt->close();
             <!-- Hidden real submit field + clear flag -->
             <input type="hidden" id="edit-color-hidden" name="color_hex" value="#ffffff">
             <input type="hidden" id="edit-clear-color" name="clear_color" value="0">
-            <button type="button" onclick="clearEditColor()" class="bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg">Farbe löschen</button>
+            <button type="button" onclick="clearEditColor()" class="bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg">Keine Farbe</button>
           </div>
+
+          <!-- IMG_FIT Checkbox in Edit Modal -->
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="edit-img-fit" name="img_fit" value="1" />
+            <span class="text-sm text-gray-300">Ganzes Bild anzeigen</span>
+          </label>
 
           <div class="flex gap-2">
             <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Speichern</button>
@@ -544,8 +592,8 @@ $stmt->close();
       }
     });
 
-    // Open edit modal and populate fields
-    function openEditModal(id, name, price, image_url, product_url, color_hex) {
+    // Open edit modal and populate fields (jetzt inkl. img_fit)
+    function openEditModal(id, name, price, image_url, product_url, color_hex, img_fit) {
       document.getElementById('edit-id').value = id;
       document.getElementById('edit-name').value = name;
       document.getElementById('edit-price').value = price;
@@ -557,6 +605,12 @@ $stmt->close();
       document.getElementById('edit-color-text').value   = (color_hex && color_hex !== '') ? color_hex : '';
       document.getElementById('edit-color-hidden').value = (color_hex && color_hex !== '') ? color_hex : '';
       document.getElementById('edit-clear-color').value  = '0';
+
+      // img_fit handling
+      const editImgFit = document.getElementById('edit-img-fit');
+      if (editImgFit) {
+        editImgFit.checked = (parseInt(img_fit, 10) === 1);
+      }
 
       document.getElementById('editModal').classList.remove('hidden');
     }

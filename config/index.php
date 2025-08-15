@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Einstellungen Auswahl</title>
-  <!-- Tailwind CSS via CDN -->
+  <!-- Tailwind CSS via tail.js -->
   <script src="../tail.js"></script>
   <script>
     tailwind.config = {
@@ -41,7 +41,7 @@
       </a>
       <!-- Wunschlisten Settings -->
       <a href="items.php" class="block bg-gray-800 hover:bg-gray-700 transition-colors p-6 rounded-lg border border-gray-700 shadow-md">
-        <h2 class="text-xl sm:text-2xl font-semibold mb-2">Wunschlisten Settings</h2>
+        <h2 class="text-xl sm:text-2xl font-semibold mb-2">Wunsh Settings</h2>
         <p class="text-gray-300 text-sm sm:text-base">Verwalte Deine Wunschlisten Einträge.</p>
       </a>
       <!-- Database Setup -->

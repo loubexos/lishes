@@ -18,7 +18,7 @@ if (file_exists($versionFile)) {
     $logs[] = ['message' => "❌ Version file not found at {$versionFile}, defaulting to {$setupVersion}", 'type' => 'error'];
 }
 
-// 4) Load your DB connection (expects: $conn = new mysqli(...))
+// 4) Load DB connection (expects: $conn = new mysqli(...))
 require_once '../config.php';
 if (!isset($conn) || $conn->connect_error) {
     $logs[]   = ['message' => '❌ Database connection failed: ' . ($conn->connect_error ?? 'unknown'), 'type' => 'error'];
@@ -112,8 +112,10 @@ $schemas = [
       "product_url VARCHAR(255)",
       "is_favorite BOOLEAN DEFAULT FALSE",
       "position INT NOT NULL DEFAULT 0",
-      /* NEU: individuelle Wunsch-Farbe (HEX) */
-      "color_hex VARCHAR(7) NULL"
+      /* individuelle Wunsch-Farbe (HEX) */
+      "color_hex VARCHAR(7) NULL",
+      /* image fit flag (0 = contain/default, 1 = cover) */
+      "img_fit TINYINT(1) NOT NULL DEFAULT 0"
     ]
   ],
   'customization_settings' => [
@@ -133,7 +135,7 @@ $schemas = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ",
     'columns' => [
-      /* NEU: Favoriten-Randfarbe per Preset (HEX, z.B. "#facc15") */
+      /* Favoriten-Randfarbe per Preset (HEX, z.B. "#facc15") */
       "favorite_border_hex VARCHAR(7) NOT NULL DEFAULT '#facc15'"
     ]
   ]
@@ -212,7 +214,7 @@ if (!$skipSetup && !$hasError) {
     $conn->close();
 }
 
-// 10) Render HTML + Tailwind Dark‑Mode
+// 10) Render HTML
 ?>
 <!DOCTYPE html>
 <html lang="en" class="dark">
