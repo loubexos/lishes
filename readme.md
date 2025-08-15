@@ -8,7 +8,7 @@ Lishes is an easy-to-manage personal wish list so you can easily send your wishe
 
 # languages
 - German
-Others Planned!
+> More Coming Soon!
 
 # Help
 Hi, this is my first project with php and mysql if i did something wrong please help me and support this project and try it yourself and describe what exactly was done wrong, feel free to help us :)
