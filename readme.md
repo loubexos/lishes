@@ -11,8 +11,8 @@ Lishes is an easy-to-manage personal wish list so you can easily send your wishe
 > More Coming Soon!
 
 # Help
-- DISCLAIMER: This project is artificial intelligence assisted.
-Hi, this is my first project with php and mysql if i did something wrong please help me and support this project and try it yourself and describe what exactly was done wrong, feel free to help us :)
+- DISCLAIMER: This project is artificial intelligence assisted. <br>
+- Hi, this is my first project with php and mysql if i did something wrong please help me and support this project and try it yourself and describe what exactly was done wrong, feel free to help us :)
 
 Thank you very much
 Loubexos
